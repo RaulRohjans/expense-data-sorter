@@ -1,4 +1,4 @@
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods, broad-exception-caught, no-member
 """
 Provides the database schema, handles entity creation and record management
 """
@@ -38,13 +38,61 @@ class Database:
     def __init__(self, uri='sqlite:///expense.db'):
         self.engine = create_engine(uri)
         Base.metadata.create_all(self.engine)
-        self.session = sessionmaker(bind=self.engine)
+        self.__insert_initial_categories()
+
+    def __insert_initial_categories(self):
+        """
+        Creates records in the categories table
+        """
+        session = self.get_session()
+
+        predefined_categories = [
+            "Salario",
+            "Bolsa de Estudos",
+            "Network Sharing",
+            "Ebay/Vendas",
+            "Depositos",
+            "Creditos",
+            "MB Way",
+            "Alimentacao",
+            "Combustivel",
+            "Via Verde",
+            "Seguro",
+            "Prestacao Veiculo",
+            "Despesas Veiculo",
+            "Transportes",
+            "Rendas/Estadia",
+            "Viagens",
+            "Vodafone",
+            "Google Drive",
+            "Lazer",
+            "Roupa",
+            "Compras",
+            "Saude",
+            "Beleza",
+            "Levantamentos",
+            "Ginasio",
+            "Universidade",
+            "Outros"
+        ]
+
+        try:
+            if not session.query(Category).first(): # If just created
+                # Insert default categories in db
+                categories = [Category(category=cat) for cat in predefined_categories]
+                session.add_all(categories)
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            print(f"Error inserting predefined categories: {e}")
+        finally:
+            session.close()
 
     def get_session(self):
         """
         Returns the database session
         """
-
-        return self.session()
+        session = sessionmaker(bind=self.engine)
+        return session
 
 db = Database()

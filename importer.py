@@ -1,4 +1,4 @@
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods, no-member, broad-exception-caught
 '''
 Module that handles all the import logic for the
 multiple sources
@@ -6,6 +6,12 @@ multiple sources
 
 import os
 import sys
+import pandas as pd
+from database import (
+    Expense,
+    db
+)
+
 
 class Importer:
     '''
@@ -15,6 +21,11 @@ class Importer:
     def __init__(self, transaction_type, file_path):
         self.type = transaction_type
         self.path = file_path
+        self.db_session = db.get_session()
+
+    def __del__(self):
+        # Close db session when destroyed
+        self.db_session.close()
 
     def start(self):
         '''
@@ -44,20 +55,41 @@ class Importer:
             'types are:\n', ', '.join(supported_files))
             sys.exit()
 
-
         # Check if the file exists
         if not os.path.isfile(self.path):
             print('The provided file does not exist or is invalid.')
             sys.exit()
 
-
     def __import_activobank(self):
         '''
         Starts the import process "activobank"
+
+        In this Excel file, the table columns start on line 8
+        We only want the data in the columns B (date), C (description)
+        and D (value)
         '''
+        # Validate file
         self.__validate_path()
 
-        return False
+        filter_columns = {'Data Valor': 'date', 'Descrição': 'description', 'Valor': 'value'}
+
+        # Read excel file data
+        df = pd.read_excel(self.path, skiprows=8 - 1) # Actual data starts at row 8, skip all above
+
+        # Filter wanted columns
+        fdf = df[filter_columns.keys()]
+
+        # Prepare data for db insertion
+        df.rename(columns=filter_columns)
+        expenses = [Expense(**data) for data in fdf]
+
+        try:
+            # Bulk insert data
+            self.db_session.add_all(expenses, inplace=True)
+        except Exception as e:
+            # Rollback changes in case of error
+            self.db_session.rollback()
+            print("The following error ocurred while importing transactions:\n", e)
 
     def __import_caixa(self):
         '''

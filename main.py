@@ -5,13 +5,9 @@ offers some commands to view data, and allows display of statistics
 
 import argparse
 import sys
-from importer import Importer
 
-def start_statistics():
-    '''
-    Starts the server for the dashboard with statistics
-    '''
-    return 0
+from importer import Importer
+from utils import throw_error
 
 def main():
     '''
@@ -22,24 +18,21 @@ def main():
     parser = argparse.ArgumentParser(description='Transaction Importer and Statistical Tool')
 
     # Add arguments
-    parser.add_argument('--import', type=str, dest='import_type', required=False,
+    parser.add_argument('--import', type=str, dest='import_type', required=True,
                         help='The import statement type. Ex: "activobank", "caixa", "oney"')
     parser.add_argument('--path', type=str, required='--import' in sys.argv,
                         help='The path of the file to be imported.')
-    parser.add_argument('--statistics', type=bool, required=False,
-                        help='Show the statistics dashboard.')
 
     # Parse arguments
     args = parser.parse_args()
 
-    # In case of an import operation, start the corresponding logic
-    if args.import_type and args.path:
-        imp = Importer(args.import_type, args.path)
-        imp.start()
-        return
+    if not args.import_type or not args.path:
+        throw_error("Invalid arguments, please check help and try again.")
 
-    # Display statistics dashboard as the default behavior
-    start_statistics()
+    # Start data import
+    imp = Importer(args.import_type, args.path)
+    imp.start()
+    return
 
 if __name__ == '__main__':
     main()

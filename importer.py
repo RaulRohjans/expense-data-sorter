@@ -7,10 +7,9 @@ multiple sources
 import os
 import sys
 import pandas as pd
-from database import (
-    Expense,
-    db
-)
+
+from utils import throw_error
+from gsheets import GSheets
 
 
 class Importer:
@@ -21,11 +20,9 @@ class Importer:
     def __init__(self, transaction_type, file_path):
         self.type = transaction_type
         self.path = file_path
-        self.db_session = db.get_session()
 
-    def __del__(self):
-        # Close db session when destroyed
-        self.db_session.close()
+        # Init google sheets service
+        self.gsheets = GSheets()
 
     def start(self):
         '''
@@ -40,9 +37,8 @@ class Importer:
         elif self.type.lower() == 'oney':
             self.__import_oney()
         else:
-            print('The given import type is not valid, please check'
+            throw_error('The given import type is not valid, please check'
             'the supported types within the help menu.')
-            sys.exit()
 
     def __validate_path(self):
         '''
@@ -51,14 +47,12 @@ class Importer:
         supported_files = ['.xls', '.xlsx']
 
         if os.path.splitext(self.path)[1] not in supported_files:
-            print('The file type provided is not supported, currently only the following '
+            throw_error('The file type provided is not supported, currently only the following '
             'types are:\n', ', '.join(supported_files))
-            sys.exit()
 
         # Check if the file exists
         if not os.path.isfile(self.path):
-            print('The provided file does not exist or is invalid.')
-            sys.exit()
+            throw_error('The provided file does not exist or is invalid.')
 
     def __import_activobank(self):
         '''
@@ -68,28 +62,29 @@ class Importer:
         We only want the data in the columns B (date), C (description)
         and D (value)
         '''
-        # Validate file
         self.__validate_path()
 
-        filter_columns = {'Data Valor': 'date', 'Descrição': 'description', 'Valor': 'value'}
-
-        # Read excel file data
         df = pd.read_excel(self.path, skiprows=8 - 1) # Actual data starts at row 8, skip all above
 
-        # Filter wanted columns
+        # Filter out the trash
+        filter_columns = {'Data Valor': 'date', 'Descrição': 'description', 'Valor': 'value'}
         fdf = df[filter_columns.keys()]
 
-        # Prepare data for db insertion
-        df.rename(columns=filter_columns)
-        expenses = [Expense(**data) for data in fdf]
+        # Now we prepare the data to be inserted into the table
+        # for each of the records, we want to add the bank, and a None
+        # value for the category, since the user should be the one deciding
+        # where it belongs
+        expenses_to_insert = fdf.values.tolist()
+        expenses_to_insert = [[
+            entry[0].strftime('%Y-%m-%d') if pd.notnull(entry[0]) else None,
+            'ActivoBank',
+            entry[2],
+            None,
+            entry[1]
+            ] for entry in expenses_to_insert]
 
-        try:
-            # Bulk insert data
-            self.db_session.add_all(expenses, inplace=True)
-        except Exception as e:
-            # Rollback changes in case of error
-            self.db_session.rollback()
-            print("The following error ocurred while importing transactions:\n", e)
+        # Finally we only need to add the data to the excel spreadsheet
+        self.gsheets.add_expense(expenses_to_insert)
 
     def __import_caixa(self):
         '''

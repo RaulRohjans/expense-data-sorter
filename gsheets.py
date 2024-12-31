@@ -27,10 +27,10 @@ class GSheets:
 
         self.credentials_path = getenv('GAPP_CREDENTIALS')
         self.sheet_id = getenv('SHEET_ID')
-        self.table_name = getenv('TABLE_NAME')
+        self.sheet_name = getenv('SHEET_NAME')
 
-        if not self.table_name:
-            self.table_name = 'Expenses' # Set default
+        if not self.sheet_name:
+            self.sheet_name = 'Expenses' # Set default
 
         if not self.credentials_path or not self.sheet_id:
             throw_error('Please make sure the envs GAPP_CREDENTIALS and SHEET_ID are set.')
@@ -79,7 +79,7 @@ class GSheets:
             service = build("sheets", "v4", credentials=self.creds)
 
             # Specify the range and prepare the data to append
-            range_name = f"{self.table_name}!A:E" # We want the columns A to E from the table
+            range_name = f"{self.sheet_name}!A:E" # We want the columns A to E from the table
             body = { 'values': expenses }
 
             # Call the Sheets API to append the data

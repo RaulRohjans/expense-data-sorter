@@ -4,3 +4,5 @@ credentials.json
 .env
 venv
 token.json
+build
+dist
